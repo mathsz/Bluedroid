@@ -75,7 +75,6 @@ typedef struct
     bt_bdaddr_t peer_bda;
     btif_sm_handle_t sm_handle;
     UINT8 flags;
-    tBTA_AV_EDR edr;
 } btif_av_cb_t;
 
 /*****************************************************************************
@@ -238,7 +237,6 @@ static BOOLEAN btif_av_state_idle_handler(btif_sm_event_t event, void *p_data)
             /* clear the peer_bda */
             memset(&btif_av_cb.peer_bda, 0, sizeof(bt_bdaddr_t));
             btif_av_cb.flags = 0;
-            btif_av_cb.edr = 0;
             btif_a2dp_on_idle();
             break;
 
@@ -342,14 +340,12 @@ static BOOLEAN btif_av_state_opening_handler(btif_sm_event_t event, void *p_data
             tBTA_AV *p_bta_data = (tBTA_AV*)p_data;
             btav_connection_state_t state;
             btif_sm_state_t av_state;
-            BTIF_TRACE_DEBUG2("status:%d, edr 0x%x",p_bta_data->open.status,
-                               p_bta_data->open.edr);
+            BTIF_TRACE_DEBUG1("status:%d", p_bta_data->open.status);
 
             if (p_bta_data->open.status == BTA_AV_SUCCESS)
             {
                  state = BTAV_CONNECTION_STATE_CONNECTED;
                  av_state = BTIF_AV_STATE_OPENED;
-                 btif_av_cb.edr = p_bta_data->open.edr;
             }
             else
             {
@@ -471,7 +467,8 @@ static BOOLEAN btif_av_state_opened_handler(btif_sm_event_t event, void *p_data)
         case BTIF_SM_ENTER_EVT:
             btif_av_cb.flags &= ~BTIF_AV_FLAG_PENDING_STOP;
             btif_av_cb.flags &= ~BTIF_AV_FLAG_PENDING_START;
-            break;
+            btif_media_check_iop_exceptions(btif_av_cb.peer_bda.address);
+             break;
 
         case BTIF_SM_EXIT_EVT:
             btif_av_cb.flags &= ~BTIF_AV_FLAG_PENDING_START;
@@ -1023,26 +1020,3 @@ BOOLEAN btif_av_is_connected(void)
     btif_sm_state_t state = btif_sm_get_state(btif_av_cb.sm_handle);
     return ((state == BTIF_AV_STATE_OPENED) || (state ==  BTIF_AV_STATE_STARTED));
 }
-
-/*******************************************************************************
-**
-** Function         btif_av_is_peer_edr
-**
-** Description      Check if the connected a2dp device supports
-**                  EDR or not. Only when connected this function
-**                  will accurately provide a true capability of
-**                  remote peer. If not connected it will always be false.
-**
-** Returns          TRUE if remote device is capable of EDR
-**
-*******************************************************************************/
-BOOLEAN btif_av_is_peer_edr(void)
-{
-    ASSERTC(btif_av_is_connected(), "No active a2dp connection", 0);
-
-    if (btif_av_cb.edr)
-        return TRUE;
-    else
-        return FALSE;
-}
-
